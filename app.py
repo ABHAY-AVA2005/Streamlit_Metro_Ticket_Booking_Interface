@@ -6,13 +6,12 @@
 # 2. Dynamic Cab Toggle using Session State (Buttons)
 # 3. Car Type Selection (Mini, Sedan, SUV) with dynamic pricing
 # 4. QR code generation with unified journey details
-# 5. Ticket download & Voice announcement
+# 5. Ticket download (QR as PNG + Ticket as TXT)
 # ============================================================
 
 # ---------------- IMPORTS ----------------
 import streamlit as st          # Streamlit UI framework
 import qrcode                   # QR code generation
-from gtts import gTTS           # Google Text-to-Speech
 from io import BytesIO          # In-memory byte streams
 import uuid                     # Unique ticket ID generator
 
@@ -23,9 +22,9 @@ st.set_page_config(
     layout="centered"
 )
 
-
+# ============================================================
 # FUNCTION: GENERATE QR CODE
-
+# ============================================================
 def generate_qr_code(ticket_text: str) -> BytesIO:
     """
     Generates a QR code image from ticket text.
@@ -49,27 +48,15 @@ def generate_qr_code(ticket_text: str) -> BytesIO:
 
     return qr_buffer
 
-# FUNCTION: GENERATE VOICE ANNOUNCEMENT
-
-def generate_voice_audio(message: str) -> BytesIO:
-    """
-    Converts text to speech using gTTS.
-    Returns the audio as a BytesIO object (MP3 format).
-    """
-    tts = gTTS(text=message, lang="en")
-    audio_buffer = BytesIO()
-    tts.write_to_fp(audio_buffer)
-    audio_buffer.seek(0)   # Reset buffer pointer to start
-    return audio_buffer
-
-
+# ============================================================
 # SESSION STATE (MEMORY FOR CAB TOGGLE)
-
+# ============================================================
 if "show_cab_details" not in st.session_state:
     st.session_state.show_cab_details = False
 
+# ============================================================
 # CONSTANTS & DATA
-
+# ============================================================
 METRO_PRICE = 30
 
 # Different rates per person based on Car Type
@@ -89,17 +76,17 @@ LOCATIONS = [
     "Hospital", "College", "Hotel"
 ]
 
-
+# ============================================================
 # USER INTERFACE: TITLE & PASSENGER DETAILS
-
+# ============================================================
 st.title("🏙️ UNIFIED CITY COMMUTE SYSTEM")
 st.markdown("### Passenger Details")
 
 passenger_name = st.text_input("Passenger Name")
 
-
+# ============================================================
 # SECTION 1: METRO DETAILS
-
+# ============================================================
 st.markdown("### 1. Metro Details")
 
 col1, col2 = st.columns(2)
@@ -118,9 +105,9 @@ ticket_count = st.number_input(
 metro_fare = ticket_count * METRO_PRICE
 st.info(f"🚇 Metro Fare: ₹{metro_fare}")
 
-
+# ============================================================
 # SECTION 2: CAB REQUIREMENT
-
+# ============================================================
 st.markdown("### 2. Cab Requirement")
 st.write("Do you need a cab for the last mile?")
 
@@ -159,9 +146,9 @@ if st.session_state.show_cab_details:
 else:
     st.caption("Status: Cab booking is currently disabled.")
 
-
+# ============================================================
 # FARE CALCULATION & TOTALS
-
+# ============================================================
 st.markdown("---")
 grand_total = metro_fare + cab_fare
 st.markdown(f"### 💰 Grand Total: ₹{grand_total}")
@@ -172,9 +159,9 @@ ticket_id = str(uuid.uuid4())[:8].upper()
 # Determine Button Text
 btn_text = "🎫 Book Metro & Cab" if st.session_state.show_cab_details else "🎫 Book Metro Only"
 
-
+# ============================================================
 # BOOK TICKET ACTION
-
+# ============================================================
 if st.button(btn_text, type="primary"):
 
     # -------- VALIDATION ----------
@@ -206,12 +193,6 @@ Amount    : ₹{cab_fare}
 GRAND TOTAL : ₹{grand_total}
 -------------------------
             """
-            voice_msg = (
-                f"Hello {passenger_name}. "
-                f"Your metro from {source_station} to {destination_station}, "
-                f"and {selected_car} cab to {cab_drop} is booked. "
-                f"Total amount is rupees {grand_total}."
-            )
         else:
             # METRO ONLY TICKET
             ticket_text = f"""
@@ -225,12 +206,6 @@ Tickets   : {ticket_count}
 Amount    : ₹{metro_fare}
 -------------------------
             """
-            voice_msg = (
-                f"Hello {passenger_name}. "
-                f"Your metro ticket from {source_station} to {destination_station} "
-                f"is booked successfully. "
-                f"Total amount is rupees {metro_fare}."
-            )
 
         # -------- QR CODE GENERATION ----------
         qr_bytes = generate_qr_code(ticket_text)
@@ -262,9 +237,3 @@ Amount    : ₹{metro_fare}
             file_name=f"Journey_{ticket_id}.txt",
             mime="text/plain"
         )
-
-        # -------- VOICE ANNOUNCEMENT ----------
-        audio_bytes = generate_voice_audio(voice_msg)
-
-        st.markdown("### 🔊 Voice Announcement")
-        st.audio(audio_bytes, format="audio/mp3")
