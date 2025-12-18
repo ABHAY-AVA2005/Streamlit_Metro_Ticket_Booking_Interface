@@ -1,55 +1,27 @@
 # ============================================================
-# METRO + CAB TICKET BOOKING APPLICATION (STREAMLIT)
+# UNIFIED CITY COMMUTE APPLICATION (METRO + CAB)
 # ============================================================
 # Features:
-# 1. Metro ticket booking with passenger count
-# 2. Optional cab booking for last-mile travel
-# 3. Automatic fare calculation (Metro + Cab)
-# 4. QR code generation containing full ticket details
-# 5. Immediate bill / ticket display after booking
-# 6. Ticket download as QR image
+# 1. Metro booking with optional Cab integration
+# 2. Dynamic Cab Toggle using Session State (Buttons)
+# 3. Car Type Selection (Mini, Sedan, SUV) with dynamic pricing
+# 4. QR code generation with unified journey details
+# 5. Ticket download & Voice announcement
 # ============================================================
-
 
 # ---------------- IMPORTS ----------------
 import streamlit as st          # Streamlit UI framework
 import qrcode                   # QR code generation
-from io import BytesIO          # In-memory byte stream handling
-import uuid                     # Unique booking ID generator
-
+from gtts import gTTS           # Google Text-to-Speech
+from io import BytesIO          # In-memory byte streams
+import uuid                     # Unique ticket ID generator
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
-    page_title="Metro and Cab Booking",
+    page_title="Unified City Commute",
+    page_icon="🏙️",
     layout="centered"
 )
-
-
-# ============================================================
-# CONSTANTS (FARE & LOCATIONS)
-# ============================================================
-
-METRO_PRICE = 30        # Fixed fare per passenger for Metro
-CAB_PRICE = 50          # Fixed fare per passenger for Cab
-
-STATIONS = [
-    "Ameerpet",
-    "KPHB",
-    "Kukatpally",
-    "Madhapur",
-    "Hitech City",
-    "Raidurg"
-]
-
-LOCATIONS = [
-    "Office",
-    "Home",
-    "Shopping Mall",
-    "Hospital",
-    "College",
-    "Hotel"
-]
-
 
 # ============================================================
 # FUNCTION: GENERATE QR CODE
@@ -57,180 +29,244 @@ LOCATIONS = [
 def generate_qr_code(ticket_text: str) -> BytesIO:
     """
     Generates a QR code image from ticket text.
-    Returns the QR image as a BytesIO object (PNG format),
-    which Streamlit can display or allow for download.
+    Returns the QR code as a BytesIO object (PNG format).
     """
     qr = qrcode.QRCode(
-        version=1,        # Controls QR size
-        box_size=8,       # Pixel size of each box
-        border=4          # Border thickness
+        version=1,
+        box_size=10,
+        border=4
     )
     qr.add_data(ticket_text)
     qr.make(fit=True)
 
+    # Generate the QR image
     qr_image = qr.make_image(fill_color="black", back_color="white")
 
-    buffer = BytesIO()
-    qr_image.save(buffer, format="PNG")
-    buffer.seek(0)
+    # Save image to BytesIO buffer
+    qr_buffer = BytesIO()
+    qr_image.save(qr_buffer, format="PNG")
+    qr_buffer.seek(0)   # Reset buffer pointer to start
 
-    return buffer
-
+    return qr_buffer
 
 # ============================================================
-# SESSION STATE (TO REMEMBER CAB SELECTION)
+# FUNCTION: GENERATE VOICE ANNOUNCEMENT
+# ============================================================
+def generate_voice_audio(message: str) -> BytesIO:
+    """
+    Converts text to speech using gTTS.
+    Returns the audio as a BytesIO object (MP3 format).
+    """
+    tts = gTTS(text=message, lang="en")
+    audio_buffer = BytesIO()
+    tts.write_to_fp(audio_buffer)
+    audio_buffer.seek(0)   # Reset buffer pointer to start
+    return audio_buffer
+
+# ============================================================
+# SESSION STATE (MEMORY FOR CAB TOGGLE)
 # ============================================================
 if "show_cab_details" not in st.session_state:
     st.session_state.show_cab_details = False
 
+# ============================================================
+# CONSTANTS & DATA
+# ============================================================
+METRO_PRICE = 30
+
+# Different rates per person based on Car Type
+CAB_RATES = {
+    "Mini": 40,
+    "Sedan": 60,
+    "SUV": 90
+}
+
+STATIONS = [
+    "Ameerpet", "KPHB", "Kukatpally", 
+    "Madhapur", "Hitech City", "Raidurg"
+]
+
+LOCATIONS = [
+    "Office", "Home", "Shopping Mall", 
+    "Hospital", "College", "Hotel"
+]
 
 # ============================================================
-# MAIN APPLICATION
+# USER INTERFACE: TITLE & PASSENGER DETAILS
 # ============================================================
-def main():
+st.title("🏙️ UNIFIED CITY COMMUTE SYSTEM")
+st.markdown("### Passenger Details")
 
-    # ---------------- TITLE ----------------
-    st.title("🚇 Metro and Cab Booking System")
+passenger_name = st.text_input("Passenger Name")
 
-    # ---------------- PASSENGER DETAILS ----------------
-    passenger_name = st.text_input("Passenger Full Name")
-    st.markdown("---")
+# ============================================================
+# SECTION 1: METRO DETAILS
+# ============================================================
+st.markdown("### 1. Metro Details")
 
-    # ---------------- METRO DETAILS ----------------
-    st.header("1. Metro Details")
+col1, col2 = st.columns(2)
+with col1:
+    source_station = st.selectbox("Source Station", STATIONS)
+with col2:
+    destination_station = st.selectbox("Destination Station", STATIONS, index=1)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        source = st.selectbox("Source Station", STATIONS)
-    with col2:
-        destination = st.selectbox("Destination Station", STATIONS, index=1)
+ticket_count = st.number_input(
+    "Number of Passengers",
+    min_value=1,
+    max_value=10,
+    step=1
+)
 
-    # Number of passengers (tickets)
-    passenger_count = st.number_input(
-        "Number of Passengers",
-        min_value=1,
-        value=1,
-        step=1
-    )
+metro_fare = ticket_count * METRO_PRICE
+st.info(f"🚇 Metro Fare: ₹{metro_fare}")
 
-    # Metro fare calculation
-    metro_fare = passenger_count * METRO_PRICE
-    st.info(f"🚇 Metro Fare: ₹{metro_fare}")
+# ============================================================
+# SECTION 2: CAB REQUIREMENT
+# ============================================================
+st.markdown("### 2. Cab Requirement")
+st.write("Do you need a cab for the last mile?")
 
-    st.markdown("---")
+# Buttons for Yes/No
+if st.button("YES - Add Cab"):
+    st.session_state.show_cab_details = True
 
-    # ---------------- CAB REQUIREMENT ----------------
-    st.header("2. Cab Requirement")
-    st.write("Do you need a cab for last-mile connectivity?")
+if st.button("NO - Metro Only"):
+    st.session_state.show_cab_details = False
 
-    col_yes, col_no = st.columns(2)
-    with col_yes:
-        if st.button("YES"):
-            st.session_state.show_cab_details = True
-    with col_no:
-        if st.button("NO"):
-            st.session_state.show_cab_details = False
+# Initialize Cab Variables
+cab_pickup = "N/A"
+cab_drop = "N/A"
+cab_fare = 0
+selected_car = "None"
 
-    # Default cab values
-    cab_pickup = "N/A"
-    cab_drop = "N/A"
-    cab_fare = 0
+# Conditional Cab Input
+if st.session_state.show_cab_details:
+    st.markdown("#### 🚖 Cab Details")
+    
+    # Pickup is auto-set to Metro Destination
+    cab_pickup = destination_station
+    st.text_input("Pickup Location", value=cab_pickup, disabled=True)
+    
+    # Drop Location
+    cab_drop = st.selectbox("Drop Location", LOCATIONS)
 
-    # ---------------- CAB DETAILS ----------------
-    if st.session_state.show_cab_details:
-        st.subheader("Cab Booking Details")
+    # Car Type Selection
+    selected_car = st.selectbox("Select Car Type", list(CAB_RATES.keys()))
+    
+    # Calculate Cab Fare dynamically based on selection
+    rate_per_person = CAB_RATES[selected_car]
+    cab_fare = ticket_count * rate_per_person
+    
+    st.info(f"🚖 Cab Fare ({selected_car}): ₹{cab_fare}")
+else:
+    st.caption("Status: Cab booking is currently disabled.")
 
-        # Pickup is automatically metro destination
-        cab_pickup = destination
-        st.text_input(
-            "Pickup Location",
-            value=cab_pickup,
-            disabled=True
+# ============================================================
+# FARE CALCULATION & TOTALS
+# ============================================================
+st.markdown("---")
+grand_total = metro_fare + cab_fare
+st.markdown(f"### 💰 Grand Total: ₹{grand_total}")
+
+# Generate a short unique ticket ID
+ticket_id = str(uuid.uuid4())[:8].upper()
+
+# Determine Button Text
+btn_text = "🎫 Book Metro & Cab" if st.session_state.show_cab_details else "🎫 Book Metro Only"
+
+# ============================================================
+# BOOK TICKET ACTION
+# ============================================================
+if st.button(btn_text, type="primary"):
+
+    # -------- VALIDATION ----------
+    if passenger_name.strip() == "":
+        st.error("Passenger name is required.")
+    elif source_station == destination_station:
+        st.error("Source and destination stations must be different.")
+    else:
+        # -------- TICKET TEXT CONSTRUCTION ----------
+        if st.session_state.show_cab_details:
+            # UNIFIED TICKET
+            ticket_text = f"""
+UNIFIED JOURNEY TICKET
+-------------------------
+Ticket ID : {ticket_id}
+Passenger : {passenger_name}
+-------------------------
+[METRO]
+From      : {source_station}
+To        : {destination_station}
+Amount    : ₹{metro_fare}
+-------------------------
+[CAB]
+Car Type  : {selected_car}
+Pickup    : {cab_pickup}
+Drop      : {cab_drop}
+Amount    : ₹{cab_fare}
+-------------------------
+GRAND TOTAL : ₹{grand_total}
+-------------------------
+            """
+            voice_msg = (
+                f"Hello {passenger_name}. "
+                f"Your metro from {source_station} to {destination_station}, "
+                f"and {selected_car} cab to {cab_drop} is booked. "
+                f"Total amount is rupees {grand_total}."
+            )
+        else:
+            # METRO ONLY TICKET
+            ticket_text = f"""
+METRO TICKET
+-------------------------
+Ticket ID : {ticket_id}
+Passenger : {passenger_name}
+From      : {source_station}
+To        : {destination_station}
+Tickets   : {ticket_count}
+Amount    : ₹{metro_fare}
+-------------------------
+            """
+            voice_msg = (
+                f"Hello {passenger_name}. "
+                f"Your metro ticket from {source_station} to {destination_station} "
+                f"is booked successfully. "
+                f"Total amount is rupees {metro_fare}."
+            )
+
+        # -------- QR CODE GENERATION ----------
+        qr_bytes = generate_qr_code(ticket_text)
+
+        # -------- DISPLAY RESULTS ----------
+        st.success("✅ Booking Confirmed Successfully")
+
+        st.markdown("### 🧾 Ticket Details")
+        st.text(ticket_text)
+
+        st.markdown("### 📱 QR Code")
+        st.image(qr_bytes, width=200)
+
+        # -------- DOWNLOAD OPTIONS ----------
+        st.markdown("### ⬇ Download Ticket")
+
+        # Download QR code as PNG
+        st.download_button(
+            label="⬇ Download QR Code (PNG)",
+            data=qr_bytes,
+            file_name=f"Journey_{ticket_id}.png",
+            mime="image/png"
         )
 
-        # Drop location selection
-        cab_drop = st.selectbox("Drop Location", LOCATIONS)
+        # Download ticket details as TXT
+        st.download_button(
+            label="⬇ Download Ticket Details (TXT)",
+            data=ticket_text,
+            file_name=f"Journey_{ticket_id}.txt",
+            mime="text/plain"
+        )
 
-        # Cab fare calculation (same logic as metro)
-        cab_fare = passenger_count * CAB_PRICE
-        st.info(f"🚕 Cab Fare: ₹{cab_fare}")
-    else:
-        st.write("Cab Booking: ❌ Not Selected")
+        # -------- VOICE ANNOUNCEMENT ----------
+        audio_bytes = generate_voice_audio(voice_msg)
 
-    # ---------------- FINAL BILL ----------------
-    st.markdown("---")
-    grand_total = metro_fare + cab_fare
-    st.markdown(f"### 💰 Grand Total: ₹{grand_total}")
-
-    # Button text based on selection
-    button_label = (
-        "Book Metro & Cab"
-        if st.session_state.show_cab_details
-        else "Book Metro Only"
-    )
-
-    # Placeholder to show ticket immediately after booking
-    ticket_placeholder = st.empty()
-
-    # ---------------- BOOKING ACTION ----------------
-    if st.button(button_label, type="primary"):
-
-        # -------- VALIDATION --------
-        if passenger_name.strip() == "":
-            st.error("Passenger name is required.")
-            return
-
-        if source == destination:
-            st.error("Source and destination cannot be the same.")
-            return
-
-        booking_id = str(uuid.uuid4())[:8].upper()
-
-        # -------- TICKET TEXT --------
-        if st.session_state.show_cab_details:
-            ticket_text = (
-                f"UNIFIED METRO + CAB TICKET\n"
-                f"=============================\n"
-                f"Booking ID : {booking_id}\n"
-                f"Passenger  : {passenger_name}\n\n"
-                f"METRO : {source} -> {destination}\n"
-                f"CAB   : {cab_pickup} -> {cab_drop}\n\n"
-                f"Passengers : {passenger_count}\n"
-                f"Total Fare : ₹{grand_total}\n"
-                f"============================="
-            )
-            st.success("✅ Metro + Cab Booking Confirmed!")
-        else:
-            ticket_text = (
-                f"METRO TICKET\n"
-                f"=============================\n"
-                f"Booking ID : {booking_id}\n"
-                f"Passenger  : {passenger_name}\n\n"
-                f"Route : {source} -> {destination}\n"
-                f"Passengers : {passenger_count}\n"
-                f"Total Fare : ₹{metro_fare}\n"
-                f"============================="
-            )
-            st.success("✅ Metro Booking Confirmed!")
-
-        # -------- IMMEDIATE TICKET DISPLAY --------
-        with ticket_placeholder.container():
-            st.markdown("## 🧾 Ticket / Bill Details")
-            st.text(ticket_text)
-
-            qr_img = generate_qr_code(ticket_text)
-            st.image(qr_img, width=200)
-
-            st.download_button(
-                label="⬇ Download Ticket (QR)",
-                data=qr_img,
-                file_name=f"Ticket_{booking_id}.png",
-                mime="image/png"
-            )
-
-
-# ============================================================
-# APPLICATION ENTRY POINT
-# ============================================================
-if __name__ == "__main__":
-    main()
+        st.markdown("### 🔊 Voice Announcement")
+        st.audio(audio_bytes, format="audio/mp3")
