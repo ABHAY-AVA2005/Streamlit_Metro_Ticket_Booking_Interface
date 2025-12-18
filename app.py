@@ -23,9 +23,9 @@ st.set_page_config(
     layout="centered"
 )
 
-# ============================================================
+
 # FUNCTION: GENERATE QR CODE
-# ============================================================
+
 def generate_qr_code(ticket_text: str) -> BytesIO:
     """
     Generates a QR code image from ticket text.
@@ -49,9 +49,8 @@ def generate_qr_code(ticket_text: str) -> BytesIO:
 
     return qr_buffer
 
-# ============================================================
 # FUNCTION: GENERATE VOICE ANNOUNCEMENT
-# ============================================================
+
 def generate_voice_audio(message: str) -> BytesIO:
     """
     Converts text to speech using gTTS.
@@ -63,15 +62,14 @@ def generate_voice_audio(message: str) -> BytesIO:
     audio_buffer.seek(0)   # Reset buffer pointer to start
     return audio_buffer
 
-# ============================================================
+
 # SESSION STATE (MEMORY FOR CAB TOGGLE)
-# ============================================================
+
 if "show_cab_details" not in st.session_state:
     st.session_state.show_cab_details = False
 
-# ============================================================
 # CONSTANTS & DATA
-# ============================================================
+
 METRO_PRICE = 30
 
 # Different rates per person based on Car Type
@@ -91,17 +89,17 @@ LOCATIONS = [
     "Hospital", "College", "Hotel"
 ]
 
-# ============================================================
+
 # USER INTERFACE: TITLE & PASSENGER DETAILS
-# ============================================================
+
 st.title("🏙️ UNIFIED CITY COMMUTE SYSTEM")
 st.markdown("### Passenger Details")
 
 passenger_name = st.text_input("Passenger Name")
 
-# ============================================================
+
 # SECTION 1: METRO DETAILS
-# ============================================================
+
 st.markdown("### 1. Metro Details")
 
 col1, col2 = st.columns(2)
@@ -120,9 +118,9 @@ ticket_count = st.number_input(
 metro_fare = ticket_count * METRO_PRICE
 st.info(f"🚇 Metro Fare: ₹{metro_fare}")
 
-# ============================================================
+
 # SECTION 2: CAB REQUIREMENT
-# ============================================================
+
 st.markdown("### 2. Cab Requirement")
 st.write("Do you need a cab for the last mile?")
 
@@ -161,9 +159,9 @@ if st.session_state.show_cab_details:
 else:
     st.caption("Status: Cab booking is currently disabled.")
 
-# ============================================================
+
 # FARE CALCULATION & TOTALS
-# ============================================================
+
 st.markdown("---")
 grand_total = metro_fare + cab_fare
 st.markdown(f"### 💰 Grand Total: ₹{grand_total}")
@@ -174,9 +172,9 @@ ticket_id = str(uuid.uuid4())[:8].upper()
 # Determine Button Text
 btn_text = "🎫 Book Metro & Cab" if st.session_state.show_cab_details else "🎫 Book Metro Only"
 
-# ============================================================
+
 # BOOK TICKET ACTION
-# ============================================================
+
 if st.button(btn_text, type="primary"):
 
     # -------- VALIDATION ----------
